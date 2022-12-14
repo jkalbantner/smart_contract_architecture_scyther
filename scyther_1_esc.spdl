@@ -1,0 +1,69 @@
+usertype Data;
+hashfunction h;
+
+protocol escprotocol(P,M)
+{
+
+  var alpha: Data;
+  var nm1: Nonce;
+  var nm3: Nonce;
+
+  var Pid: Data;
+  var Sid: Data;
+
+  role P
+  {
+    fresh nm1: Nonce;
+    fresh nm3: Nonce;
+    fresh I: Data;
+    fresh alpha: Data;
+    fresh command: Data;
+    fresh state: Data;
+    fresh Pid: Data;
+    fresh Sid: Data;
+
+    // Init
+    macro state1 = state,command;
+    macro hstate1 = h(state1,nm1);
+    macro sigma1 = {hstate1,I}k(M,P);
+    macro m1 = Pid,command,sigma1;
+
+    macro m2 = Pid,Sid,command;
+
+    // send collateral
+    // Pi sends key with secure channel to M
+    macro state3 = state,command;
+    macro hstate3 = h(state3,nm3);
+    macro sigma3 = {hstate3,I}k(M,P);
+    macro m3 = Sid,command,{alpha}k(M,P),sigma3;
+
+    send_1(P,M, {m1}pk(M), {h({m1}pk(M))}sk(P));
+    recv_2(M,P, {m2}pk(P), {h({m2}pk(P))}sk(M));
+    send_3(P,M, {m3}pk(M), {h({m3}pk(M))}sk(P));
+
+    claim(P, Alive);
+    claim(P, Niagree);
+    claim(P, Nisynch);
+    claim(P, Weakagree);
+  }
+
+  role M
+  {
+    fresh Pid: Data;
+    fresh Sid: Data;
+    fresh command: Data;
+
+    // M creates sid
+    macro m2 = Pid,Sid,command;
+
+    recv_1(P,M, {m1}pk(M), {h({m1}pk(M))}sk(P));
+    send_2(M,P, {m2}pk(P), {h({m2}pk(P))}sk(M));
+    recv_3(P,M, {m3}pk(M), {h({m3}pk(M))}sk(P));
+
+    claim(M, Alive);
+    claim(M, Niagree);
+    claim(M, Nisynch);
+    claim(M, Weakagree);
+  }
+
+}

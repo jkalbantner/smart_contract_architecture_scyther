@@ -1,0 +1,169 @@
+usertype Data;
+usertype state;
+usertype command;
+hashfunction h;
+const Cert: Function;
+secret Cert1: Function;
+
+protocol statechannelprotocol(M,P)
+{
+  var nm1: Nonce;
+  var nm2: Nonce;
+  var Pid: Data;
+  var Scid: Data;
+  var alpha1: Data; // alpha pi
+  var alpha2: Data; // alpha m
+
+  role P
+  {
+      fresh nm1: Nonce;
+      fresh nm2: Nonce;
+      fresh Scid: Data;
+      fresh Pid: Data;
+      fresh command: Data;
+      fresh state: Data;
+      fresh t: Data;
+      fresh I: Data;
+      fresh alpha1: Data;
+      fresh alpha2: Data;
+
+      // Pi sends (scid, 'open', hstateI, stateI, nI, sigmaI, ({Pi}, 10), 0) to M
+      // Pi sends (scid, 'open-request', sigmaPi) to M
+      macro state1 = state,command;
+      macro hstate1 = h(state1,nm1);
+      macro sigma1 = {hstate1,I}k(M,P);
+      macro m1 = Pid,command,hstate1,state1,nm1,sigma1;
+
+
+      macro state2 = state,command;
+      macro hstate2 = h(state2,nm2);
+      macro sigma2 = {hstate2,I}k(M,P);
+      macro m2 = Scid,command,Cert1(M),sigma2, state2, nm2, alpha1, alpha2;
+
+
+      // Pi sends (scid,'funding',{(transaction_i, Pi)}, {(channel_identifier, {Pi, 10} )}k(Pi,M,L),sigmaPi, 0) to L
+      macro state3 = state,command;
+      macro hstate3 = h(state3,nm1);
+      macro sigma3 = {hstate3,I}k(M,P);
+      macro m3 = Scid,command,{alpha1}k(M,P),state3,hstate3,sigma3,Cert1(M),t;
+
+
+      // confirmation of m3
+      macro state4 = state,command;
+      macro hstate4 = h(state4,nm2);
+      macro sigma4 = {hstate2,I}k(M,P);
+      macro m4 = Scid, command, Cert1(M), sigma4;
+
+
+      // state channel update
+      //Pi sends transaction_i = (scid,'update',channel_identifier,hstateI,stateI,nI,sigmaI,alpha1,0) to M
+      macro state5 = state,command;
+      macro hstate5 = h(state5,nm1);
+      macro sigma5 = {hstate5,I}k(M,P);
+      macro m5 = Scid,command,{alpha1}k(M,P),state5,hstate5,sigma5,Cert1(M),t;
+
+      // M verifies (scid, channel_identifier,transaction_i, hstateI,stateI,Pi,sigmaPi).
+      // If successful, M send (scid, channel_identifier, 'update-confirm', alpha_M) to Pi.
+      // If not successful, M sends (scid, channel_identifier, 'update-abort') to Pi
+      macro state6 = state,command;
+      macro hstate6 = h(state6,nm2);
+      macro sigma6 = {hstate6,I}k(M,P);
+      macro m6 = Scid, command, Cert1(M),{alpha2}k(M,P), state6, hstate6, sigma6;
+
+      // Pi sends (scid,channel_identifier,'update-success',{alpha1,alpha2}k(M,Pi),{sigmaPi,sigmaM}k(M,Pi)) to M
+      macro state7 = state,command;
+      macro hstate7 = h(state7,nm1);
+      macro sigma7 = {hstate7,I}k(M,P);
+      macro m7 = Scid,command,{alpha1}k(M,P),{alpha2}k(M,P),state7,hstate7,sigma7,Cert1(M);
+
+      // confirm update
+      macro state8 = state,command;
+      macro hstate8 = h(state8,nm2);
+      macro sigma8 = {hstate8,I}k(M,P);
+      macro m8 = Scid, command, Cert1(M), sigma8;
+
+      // close state channel
+      // Pi send (scid, 'finalise', (ti, pi), channel_identifier, (11, 9), {sigma_Pi, sigma_M}k(M,Pi)) to L
+      macro state9 = state,command;
+      macro hstate9 = h(state9,nm1);
+      macro sigma9 = {hstate9,I}k(M,P);
+      macro m9 = Scid,command,{alpha1}k(M,P),{alpha2}k(M,P),state9,hstate9,sigma9,Cert1(M);
+
+
+      send_1(P,M, {m1}pk(M), {h({m1}pk(M))}sk(P));
+      recv_2(M,P, {m2}pk(P), {h({m2}pk(P))}sk(M));
+      send_3(P,M, {m3}pk(M), {h({m3}pk(M))}sk(P));
+      recv_4(M,P, {m4}pk(P), {h({m4}pk(P))}sk(M));
+      send_5(P,M, {m5}pk(M), {h({m5}pk(M))}sk(P));
+      recv_6(M,P, {m6}pk(P), {h({m6}pk(P))}sk(M));
+      send_7(P,M, {m7}pk(M), {h({m7}pk(M))}sk(P));
+      recv_8(M,P, {m8}pk(P), {h({m8}pk(P))}sk(M));
+      send_9(P,M, {m9}pk(M), {h({m9}pk(M))}sk(P));
+
+
+      claim(P, Alive);
+      claim(P, Niagree);
+      claim(P, Nisynch);
+      claim(P, Weakagree);
+    }
+
+    role M
+    {
+     fresh nm1: Nonce;
+      fresh nm2: Nonce;
+      fresh Scid: Data;
+      fresh Pid: Data;
+      fresh command: Data;
+      fresh state: Data;
+      fresh t: Data;
+      fresh I: Data;
+      fresh alpha1: Data;
+      fresh alpha2: Data;
+
+
+      // M sends (scid, 'open-request',sigmaM) to Pi. If no sigmaM, Pi send (scid, 'open-abort') to M
+      macro state2 = state,command;
+      macro hstate2 = h(state2,nm2);
+      macro sigma2 = {hstate2,I}k(M,P);
+      macro m2 = Scid,command,Cert1(M),sigma2, state2, nm2, alpha1, alpha2;
+
+      // confirmation of m3
+      macro state4 = state,command;
+      macro hstate4 = h(state4,nm2);
+      macro sigma4 = {hstate2,I}k(M,P);
+      macro m4 = Scid, command, Cert1(M), sigma4;
+
+      // M verifies (scid, channel_identifier,transaction_i, hstateI,stateI,Pi,sigmaPi).
+      // If successful, M send (scid, channel_identifier, 'update-confirm', alpha_M) to Pi.
+      // If not successful, M sends (scid, channel_identifier, 'update-abort') to Pi
+      macro state6 = state,command;
+      macro hstate6 = h(state6,nm2);
+      macro sigma6 = {hstate6,I}k(M,P);
+      macro m6 = Scid, command, Cert1(M),{alpha2}k(M,P), state6, hstate6, sigma6;
+
+      // confirm update
+      macro state8 = state,command;
+      macro hstate8 = h(state8,nm2);
+      macro sigma8 = {hstate8,I}k(M,P);
+      macro m8 = Scid, command, Cert1(M), sigma8;
+
+
+      recv_1(P,M, {m1}pk(M), {h({m1}pk(M))}sk(P));
+      send_2(M,P, {m2}pk(P), {h({m2}pk(P))}sk(M));
+      recv_3(P,M, {m3}pk(M), {h({m3}pk(M))}sk(P));
+      send_4(M,P, {m4}pk(P), {h({m4}pk(P))}sk(M));
+      recv_5(P,M, {m5}pk(M), {h({m5}pk(M))}sk(P));
+      send_6(M,P, {m6}pk(P), {h({m6}pk(P))}sk(M));
+      recv_7(P,M, {m7}pk(M), {h({m7}pk(M))}sk(P));
+      send_8(M,P, {m8}pk(P), {h({m8}pk(P))}sk(M));
+      recv_9(P,M, {m9}pk(M), {h({m9}pk(M))}sk(P));
+
+
+      claim(M, Alive);
+      claim(M, Niagree);
+      claim(M, Nisynch);
+      claim(M, Weakagree);
+    }
+
+
+}
